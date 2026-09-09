@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Memory — Arcade</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    --void:#05070d;
+    --panel:#0c1220;
+    --panel-2:#121b2d;
+    --violet:#7c3aed;
+    --teal:#22d3ee;
+    --magenta:#f43f5e;
+    --gold:#facc15;
+    --gold-soft:#fef08a;
+    --ivory:#f8fafc;
+    --muted:#94a3b8;
+    --line: rgba(34,211,238,0.22);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+
+  body{
+    min-height:100vh;
+    color: var(--ivory);
+    font-family:'Inter', sans-serif;
+    background: var(--void);
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  /* ---------- fondo animado ---------- */
+  .sky{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    background:
+      radial-gradient(ellipse 55% 40% at 8% 12%, rgba(124,58,237,0.24), transparent 60%),
+      radial-gradient(ellipse 50% 35% at 92% 18%, rgba(34,211,238,0.18), transparent 60%),
+      radial-gradient(ellipse 55% 45% at 50% 100%, rgba(244,63,94,0.12), transparent 60%),
+      radial-gradient(1px 1px at 10% 20%, #fff, transparent),
+      radial-gradient(1px 1px at 80% 25%, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 60% 65%, #fff, transparent),
+      radial-gradient(1px 1px at 25% 75%, #fff, transparent),
+      radial-gradient(1px 1px at 90% 80%, #fff, transparent),
+      radial-gradient(1px 1px at 45% 40%, #fff, transparent),
+      radial-gradient(1px 1px at 70% 55%, #fff, transparent),
+      linear-gradient(135deg, #07111f, var(--void) 65%);
+    animation: drift 24s ease-in-out infinite alternate;
+  }
+
+  @keyframes drift{
+    from{ filter: hue-rotate(0deg) brightness(1); }
+    to{ filter: hue-rotate(14deg) brightness(1.08); }
+  }
+
+  .shooter{
+    position:fixed;
+    top: 12%;
+    left: -10%;
+    width: 90px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold-soft));
+    opacity:0;
+    z-index:0;
+    animation: shoot 9s linear infinite;
+    animation-delay: 2s;
+  }
+  .shooter.b{ top: 62%; animation-delay: 6.5s; animation-duration: 11s; }
+
+  @keyframes shoot{
+    0%{ opacity:0; transform: translate(0,0) rotate(18deg); }
+    3%{ opacity:1; }
+    12%{ opacity:0; transform: translate(130vw, 55px) rotate(18deg); }
+    100%{ opacity:0; }
+  }
+
+  main{
+    position:relative;
+    z-index:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: 36px 18px 70px;
+    min-height:100vh;
+  }
+
+  .screen{ display:none; width:100%; max-width: 760px; }
+  .screen.active{ display:flex; flex-direction:column; align-items:center; }
+
+  /* ---------- encabezado ---------- */
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size: clamp(2.1rem, 6vw, 3rem);
+    margin: 0 0 6px;
+    text-align:center;
+    background: linear-gradient(100deg, var(--gold), var(--teal) 55%, var(--magenta));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color: transparent;
+    letter-spacing: 0.5px;
+  }
+
+  .tagline{
+    color: var(--muted);
+    text-align:center;
+    max-width: 480px;
+    margin: 0 0 34px;
+    font-size: 0.95rem;
+    line-height:1.6;
+  }
+
+  /* ---------- selector de niveles ---------- */
+  .levels{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    width:100%;
+  }
+
+  @media (min-width: 600px){
+    .levels{ grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .level-card{
+    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    padding: 22px 16px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 10px;
+    cursor:pointer;
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+    position:relative;
+  }
+
+  .level-card:hover:not(.locked){
+    transform: translateY(-4px);
+    border-color: var(--gold);
+    box-shadow: 0 14px 35px rgba(34,211,238,0.13), 0 0 0 1px rgba(250,204,21,0.12);
+  }
+
+  .level-card.locked{
+    opacity: 0.45;
+    cursor: default;
+    filter: grayscale(0.6);
+  }
+
+  .lvl-badge{
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: linear-gradient(145deg, rgba(34,211,238,0.12), rgba(124,58,237,0.18)), var(--panel);
+    border: 1.5px solid rgba(250,204,21,0.7);
+    box-shadow: 0 0 20px rgba(34,211,238,0.08);
+  }
+
+  .lvl-badge svg{ width: 60%; height:60%; stroke: var(--gold-soft); fill:none; }
+
+  .lvl-name{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size: 1.02rem;
+    text-align:center;
+  }
+
+  .lvl-sub{
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .stars-row{ display:flex; gap:3px; }
+  .stars-row svg{ width:15px; height:15px; }
+  .star-on{ fill: var(--gold); stroke: var(--gold); }
+  .star-off{ fill: none; stroke: var(--muted); stroke-width:1.5; }
+
+  .lock-icon{
+    position:absolute;
+    top:10px; right:10px;
+    width:16px; height:16px;
+    color: var(--muted);
+  }
+
+  /* ---------- pantalla de juego ---------- */
+  .game-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+    margin-bottom: 22px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .back-btn{
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ivory);
+    border-radius: 999px;
+    padding: 8px 16px 8px 12px;
+    font-size: 0.82rem;
+    font-weight:600;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .back-btn:hover{ border-color: var(--gold); background: rgba(255,207,107,0.06); }
+  .back-btn svg{ width:14px; height:14px; stroke: var(--ivory); fill:none; }
+
+  .level-title{
+    font-family:'Fraunces', serif;
+    font-size: 1.15rem;
+    color: var(--gold-soft);
+    text-align:center;
+    flex: 1;
+  }
+
+  .stats{
+    display:flex;
+    gap: 20px;
+    padding: 10px 20px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+
+  .stat{ display:flex; flex-direction:column; align-items:center; min-width: 48px; }
+  .stat .value{ font-family:'Fraunces', serif; font-size:1.15rem; font-weight:600; color: var(--teal); }
+  .stat .label{ font-size:0.65rem; color: var(--muted); margin-top:1px; }
+
+  .board{
+    display:grid;
+    gap: 10px;
+    width:100%;
+    max-width: 640px;
+    margin: 0 auto;
+    perspective: 1200px;
+  }
+
+  .card{
+    aspect-ratio: 3/4;
+    position:relative;
+    cursor:pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.5s cubic-bezier(.2,.9,.3,1);
+  }
+
+  .card.flipped{ transform: rotateY(180deg); }
+  .card.matched{ animation: settle 0.5s ease; }
+
+  @keyframes settle{
+    0%{ transform: rotateY(180deg) scale(1); }
+    50%{ transform: rotateY(180deg) scale(1.1); }
+    100%{ transform: rotateY(180deg) scale(1); }
+  }
+
+  .face{
+    position:absolute; inset:0;
+    backface-visibility:hidden;
+    border-radius: 9px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  .face.back{
+    background:
+      linear-gradient(135deg, rgba(34,211,238,0.10) 25%, transparent 25%) 0 0/18px 18px,
+      linear-gradient(315deg, rgba(124,58,237,0.10) 25%, transparent 25%) 0 0/18px 18px,
+      linear-gradient(145deg, #121b2d, #080d18);
+    border: 1px solid rgba(34,211,238,0.28);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.025), 0 8px 20px rgba(0,0,0,0.18);
+  }
+  .face.back::after{
+    content:'✦';
+    width: 42%; height:42%;
+    border-radius: 18px;
+    border: 1px solid rgba(250,204,21,0.55);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color: var(--gold);
+    font-size: clamp(1.1rem, 5vw, 1.8rem);
+    background: rgba(5,7,13,0.35);
+    box-shadow: 0 0 18px rgba(34,211,238,0.12);
+  }
+
+  .face.front{
+    background: linear-gradient(145deg, #17243a, #0c1423);
+    border: 1px solid rgba(34,211,238,0.38);
+    transform: rotateY(180deg);
+    padding: 16%;
+    box-shadow: 0 0 18px rgba(139,92,246,0.15);
+  }
+
+  .card.matched .face.front{
+    border-color: rgba(45,212,200,0.65);
+    box-shadow: 0 0 22px rgba(45,212,200,0.3);
+  }
+
+  .face.front svg{ width:100%; height:100%; stroke: var(--gold-soft); fill:none; filter: drop-shadow(0 0 7px rgba(250,204,21,0.16)); }
+  .card.matched .face.front svg{ stroke: var(--teal); filter: drop-shadow(0 0 10px rgba(34,211,238,0.55)); }
+
+  /* ---------- overlay de victoria ---------- */
+  .overlay{
+    position:fixed; inset:0;
+    background: rgba(4,2,12,0.78);
+    backdrop-filter: blur(4px);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index: 20;
+  }
+  .overlay.show{ display:flex; }
+
+  .win-card{
+    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--gold);
+    border-radius: 22px;
+    padding: 36px 40px;
+    text-align:center;
+    max-width: 340px;
+    animation: popin 0.4s cubic-bezier(.2,.9,.3,1.4);
+  }
+
+  @keyframes popin{
+    from{ transform: scale(0.85); opacity:0; }
+    to{ transform: scale(1); opacity:1; }
+  }
+
+  .win-card .big-title{
+    font-family:'Fraunces', serif;
+    font-size: 1.6rem;
+    font-weight:700;
+    color: var(--gold-soft);
+    margin-bottom: 4px;
+  }
+
+  .win-card .win-sub{ color: var(--muted); font-size:0.88rem; margin-bottom: 16px; }
+
+  .win-stars{ display:flex; justify-content:center; gap:8px; margin-bottom: 22px; }
+  .win-stars svg{ width:34px; height:34px; }
+
+  .win-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+
+  button.pill{
+    font-family:'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight:600;
+    padding: 10px 20px;
+    border-radius: 999px;
+    border: 1px solid var(--gold);
+    background: transparent;
+    color: var(--gold-soft);
+    cursor:pointer;
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+  }
+  button.pill:hover{ background: var(--gold); color:#1a1207; transform: translateY(-1px); }
+  button.pill.ghost{ border-color: var(--line); color: var(--ivory); }
+  button.pill.ghost:hover{ background: rgba(255,255,255,0.06); color: var(--ivory); }
+
+  .confetti{
+    position:fixed;
+    top: -10px;
+    width: 8px; height: 14px;
+    border-radius: 2px;
+    z-index: 25;
+    animation: fall linear forwards;
+  }
+  @keyframes fall{
+    to{ transform: translateY(110vh) rotate(400deg); opacity: 0.4; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .sky, .shooter, .card, .win-card, .confetti{ animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sky"></div>
+<div class="shooter"></div>
+<div class="shooter b"></div>
+
+<main>
+
+  <!-- PANTALLA: SELECCIÓN DE NIVEL -->
+  <section class="screen active" id="screen-menu">
+    <h1>NEON MEMORY</h1>
+    <p class="tagline">Un juego de memoria estilo arcade. Encuentra las parejas, consigue estrellas y desbloquea cada zona.</p>
+    <div class="levels" id="levels"></div>
+  </section>
+
+  <!-- PANTALLA: JUEGO -->
+  <section class="screen" id="screen-game">
+    <div class="game-top">
+      <button class="back-btn" id="backBtn">
+        <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        Niveles
+      </button>
+      <div class="level-title" id="levelTitle"></div>
+      <div class="stats">
+        <div class="stat"><div class="value" id="moves">0</div><div class="label">Mov.</div></div>
+        <div class="stat"><div class="value" id="pairs">0/0</div><div class="label">Parejas</div></div>
+        <div class="stat"><div class="value" id="timer">00:00</div><div class="label">Tiempo</div></div>
+      </div>
+    </div>
+    <div class="board" id="board"></div>
+  </section>
+
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="win-card">
+    <div class="big-title" id="winTitle">Cielo despejado</div>
+    <div class="win-sub" id="winSub"></div>
+    <div class="win-stars" id="winStars"></div>
+    <div class="win-actions">
+      <button class="pill ghost" id="retryBtn">Repetir</button>
+      <button class="pill" id="nextBtn">Siguiente nivel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  /* ---------- iconografía ---------- */
+  const ICONS = {
+    potion:   '<path d="M42 12h16M46 12v18L27 59a16 16 0 0 0 13 25h20a16 16 0 0 0 13-25L54 30V12" stroke-width="5" stroke-linejoin="round"/><path d="M34 55h32M39 67c7 5 15 5 22 0" stroke-width="4" stroke-linecap="round"/>',
+    ghost:    '<path d="M20 82V43a30 30 0 0 1 60 0v39l-10-7-10 7-10-7-10 7-10-7z" stroke-width="5" stroke-linejoin="round"/><circle cx="40" cy="45" r="3" fill="currentColor" stroke="none"/><circle cx="60" cy="45" r="3" fill="currentColor" stroke="none"/>',
+    gamepad:  '<path d="M28 35h44a13 13 0 0 1 12 9l7 24a10 10 0 0 1-18 8L65 65H35l-8 11a10 10 0 0 1-18-8l7-24a13 13 0 0 1 12-9z" stroke-width="5" stroke-linejoin="round"/><path d="M32 46v16M24 54h16M67 51h.1M75 59h.1" stroke-width="5" stroke-linecap="round"/>',
+    lightning:'<path d="M57 6L18 57h25l-5 37 39-54H52z" stroke-width="5" stroke-linejoin="round"/>',
+    gem:      '<path d="M24 22h52l12 18-36 39L16 40z" stroke-width="5" stroke-linejoin="round"/><path d="M24 22l28 57 24-57M16 40h72M39 22l13 57 16-57" stroke-width="3.5" stroke-linejoin="round"/>',
+    skull:    '<path d="M50 12a30 30 0 0 0-30 30c0 13 7 22 17 26v11h26V68c10-4 17-13 17-26a30 30 0 0 0-30-30z" stroke-width="5"/><circle cx="39" cy="43" r="5" stroke-width="4"/><circle cx="61" cy="43" r="5" stroke-width="4"/><path d="M44 58h12M46 69v10M54 69v10" stroke-width="4" stroke-linecap="round"/>',
+    heart:    '<path d="M50 84S14 61 14 36c0-12 8-20 19-20 8 0 14 5 17 11 3-6 9-11 17-11 11 0 19 8 19 20 0 25-36 48-36 48z" stroke-width="5" stroke-linejoin="round"/>',
+    crown:    '<path d="M15 31l18 17 17-29 17 29 18-17-7 48H22z" stroke-width="5" stroke-linejoin="round"/><path d="M23 68h54" stroke-width="5" stroke-linecap="round"/>',
+    rocket:   '<path d="M50 68c-10-8-14-20-11-34 3-14 11-23 11-23s8 9 11 23c3 14-1 26-11 34z" stroke-width="5"/><circle cx="50" cy="35" r="5" stroke-width="4"/><path d="M38 57L24 72l3-16M62 57l14 15-3-16M42 72l-5 18 13-12 13 12-5-18" stroke-width="4" stroke-linejoin="round"/>',
+    coffee:   '<path d="M22 34h52v27a18 18 0 0 1-18 18H40a18 18 0 0 1-18-18z" stroke-width="5"/><path d="M74 42h7a11 11 0 0 1 0 22h-7M34 21c-5-7 7-9 2-16M50 21c-5-7 7-9 2-16M66 21c-5-7 7-9 2-16" stroke-width="4" stroke-linecap="round"/>',
+    code:     '<path d="M38 25L15 50l23 25M62 25l23 25-23 25M55 17L45 83" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>',
+    headphones:'<path d="M20 52a30 30 0 0 1 60 0v25a8 8 0 0 1-8 8h-7V57h15M20 57h15v28h-7a8 8 0 0 1-8-8z" stroke-width="5" stroke-linejoin="round"/>'
+  };
+
+  /* ---------- definición de niveles ---------- */
+  const LEVELS = [
+    { name:'Nivel Pixel',      sub:'6 parejas',  pairs:6,  cols:4, badge:'gamepad' },
+    { name:'Modo Neon',        sub:'8 parejas',  pairs:8,  cols:4, badge:'lightning' },
+    { name:'Zona Arcade',      sub:'10 parejas', pairs:10, cols:5, badge:'gem' },
+    { name:'Boss Final',       sub:'12 parejas', pairs:12, cols:6, badge:'skull' }
+  ];
+
+  const ICON_KEYS = Object.keys(ICONS);
+
+  let progress = LEVELS.map((_, i) => ({ unlocked: i === 0, stars: 0 }));
+  let currentLevel = 0;
+
+  // estado de partida
+  let deck = [], flipped = [], matchedCount = 0, moves = 0, lock = false;
+  let seconds = 0, timerHandle = null, started = false;
+
+  const $ = (id) => document.getElementById(id);
+  const screenMenu = $('screen-menu');
+  const screenGame = $('screen-game');
+
+  function svgIcon(key, extraClass){
+    return `<svg viewBox="0 0 100 100" class="${extraClass||''}">${ICONS[key]}</svg>`;
+  }
+
+  function starSvg(filled){
+    return `<svg viewBox="0 0 24 24" class="${filled ? 'star-on':'star-off'}"><path d="M12 2l3 6.5 7 .8-5.2 4.8 1.4 6.9-6.2-3.6-6.2 3.6 1.4-6.9L2 9.3l7-.8z"/></svg>`;
+  }
+
+  /* ---------- render selector de niveles ---------- */
+  function renderMenu(){
+    const wrap = $('levels');
+    wrap.innerHTML = '';
+    LEVELS.forEach((lvl, i) => {
+      const p = progress[i];
+      const card = document.createElement('div');
+      card.className = 'level-card' + (p.unlocked ? '' : ' locked');
+      card.innerHTML = `
+        ${!p.unlocked ? `<svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>` : ''}
+        <div class="lvl-badge">${svgIcon(lvl.badge)}</div>
+        <div class="lvl-name">${lvl.name}</div>
+        <div class="lvl-sub">${lvl.sub}</div>
+        <div class="stars-row">${[0,1,2].map(s => starSvg(s < p.stars)).join('')}</div>
+      `;
+      if(p.unlocked){
+        card.addEventListener('click', () => enterLevel(i));
+      }
+      wrap.appendChild(card);
+    });
+  }
+
+  function showScreen(el){
+    [screenMenu, screenGame].forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  /* ---------- lógica de partida ---------- */
+  function shuffle(arr){
+    for(let i = arr.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function formatTime(s){
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const r = (s % 60).toString().padStart(2, '0');
+    return `${m}:${r}`;
+  }
+
+  function startTimer(){
+    if(started) return;
+    started = true;
+    timerHandle = setInterval(() => {
+      seconds++;
+      $('timer').textContent = formatTime(seconds);
+    }, 1000);
+  }
+  function stopTimer(){ clearInterval(timerHandle); }
+
+  function enterLevel(i){
+    currentLevel = i;
+    $('levelTitle').textContent = LEVELS[i].name;
+    buildBoard(LEVELS[i]);
+    showScreen(screenGame);
+  }
+
+  function buildBoard(level){
+    const chosenIcons = shuffle([...ICON_KEYS]).slice(0, level.pairs);
+    deck = shuffle([...chosenIcons, ...chosenIcons]);
+
+    matchedCount = 0; moves = 0; seconds = 0; started = false; flipped = []; lock = false;
+    stopTimer();
+    $('timer').textContent = '00:00';
+    $('moves').textContent = '0';
+    $('pairs').textContent = `0/${level.pairs}`;
+
+    const board = $('board');
+    board.innerHTML = '';
+    board.style.gridTemplateColumns = `repeat(${level.cols}, minmax(0, 1fr))`;
+
+    deck.forEach((key) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.key = key;
+      card.innerHTML = `
+        <div class="face back"></div>
+        <div class="face front">${svgIcon(key)}</div>
+      `;
+      card.addEventListener('click', () => onCardClick(card));
+      board.appendChild(card);
+    });
+  }
+
+  function onCardClick(card){
+    if(lock) return;
+    if(card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+    startTimer();
+    card.classList.add('flipped');
+    flipped.push(card);
+
+    if(flipped.length === 2){
+      moves++;
+      $('moves').textContent = moves;
+      lock = true;
+      const [a, b] = flipped;
+      if(a.dataset.key === b.dataset.key){
+        setTimeout(() => {
+          a.classList.add('matched');
+          b.classList.add('matched');
+          matchedCount++;
+          $('pairs').textContent = `${matchedCount}/${LEVELS[currentLevel].pairs}`;
+          flipped = [];
+          lock = false;
+          if(matchedCount === LEVELS[currentLevel].pairs){
+            stopTimer();
+            finishLevel();
+          }
+        }, 420);
+      } else {
+        setTimeout(() => {
+          a.classList.remove('flipped');
+          b.classList.remove('flipped');
+          flipped = [];
+          lock = false;
+        }, 850);
+      }
+    }
+  }
+
+  function computeStars(moves, pairs){
+    if(moves <= pairs * 1.4) return 3;
+    if(moves <= pairs * 2.1) return 2;
+    return 1;
+  }
+
+  function finishLevel(){
+    const pairs = LEVELS[currentLevel].pairs;
+    const stars = computeStars(moves, pairs);
+    progress[currentLevel].stars = Math.max(progress[currentLevel].stars, stars);
+    if(currentLevel + 1 < LEVELS.length){
+      progress[currentLevel + 1].unlocked = true;
+    }
+
+    $('winTitle').textContent = LEVELS[currentLevel].name + ' — completo';
+    $('winSub').textContent = `${moves} movimientos · ${formatTime(seconds)}`;
+    $('winStars').innerHTML = [0,1,2].map(s => starSvg(s < stars)).join('');
+
+    const nextBtn = $('nextBtn');
+    if(currentLevel + 1 < LEVELS.length){
+      nextBtn.textContent = 'Siguiente nivel';
+      nextBtn.style.display = 'inline-block';
+    } else {
+      nextBtn.style.display = 'none';
+    }
+
+    $('overlay').classList.add('show');
+    launchConfetti();
+  }
+
+  function launchConfetti(){
+    const colors = ['#ffcf6b', '#2dd4c8', '#8b5cf6', '#ff5fa2', '#f2eefc'];
+    for(let i = 0; i < 60; i++){
+      const el = document.createElement('div');
+      el.className = 'confetti';
+      el.style.left = Math.random() * 100 + 'vw';
+      el.style.background = colors[Math.floor(Math.random() * colors.length)];
+      el.style.animationDuration = (2.2 + Math.random() * 1.6) + 's';
+      el.style.opacity = 0.7 + Math.random() * 0.3;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 4200);
+    }
+  }
+
+  /* ---------- controles ---------- */
+  $('backBtn').addEventListener('click', () => {
+    stopTimer();
+    showScreen(screenMenu);
+    renderMenu();
+  });
+
+  $('retryBtn').addEventListener('click', () => {
+    $('overlay').classList.remove('show');
+    buildBoard(LEVELS[currentLevel]);
+  });
+
+  $('nextBtn').addEventListener('click', () => {
+    $('overlay').classList.remove('show');
+    if(currentLevel + 1 < LEVELS.length){
+      enterLevel(currentLevel + 1);
+    } else {
+      showScreen(screenMenu);
+      renderMenu();
+    }
+  });
+
+  renderMenu();
+})();
+</script>
+
+</body>
+</html>
